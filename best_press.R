@@ -69,3 +69,15 @@ predictors <- c("age", "weight_kg", "height_cm", "neck", "chest", "abdomen",
                 "hip", "thigh", "knee", "ankle", "biceps", "forearm", "wrist")
 bestPRESS(target, predictors, data)
 
+
+
+# alternative method with printing best subset for every subset size
+nModels <- 2**length(predictors)
+modelCodes <- seq(0, nModels - 1)
+presses <- sapply(X=modelCodes, FUN=computePRESS, target, predictors, data)
+nrPredictors <- unlist(lapply(sapply(X=modelCodes, FUN=selectPredictors, predictors), FUN = length))
+presses_predictors_df = data.frame(modelCodes, presses, nrPredictors)
+minCode_nrPredictors <- presses_predictors_df %>% arrange(nrPredictors, presses) %>% distinct(nrPredictors, .keep_all = T)
+bestPredictors <- sapply(X=minCode_nrPredictors$modelCodes, FUN = selectPredictors, predictors)
+bestPredictorsdf <- data.frame(do.call(rbind, bestPredictors))
+bestPredictorsdf[upper.tri(bestPredictorsdf)] <- NA
