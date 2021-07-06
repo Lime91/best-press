@@ -1,5 +1,5 @@
 library(MPV)
-
+library(dplyr)
 
 #' Extract predictor names from bitcode.
 #'
@@ -42,7 +42,7 @@ computePRESS <- function(code, target, predictors, data) {
 }
 
 
-#' Perfrom best subset varible selection for linear models based on Allen's 
+#' Perform best subset varaible selection for linear models based on Allen's 
 #' PRESS statistic. Computational complexity grows exponentially (!) in the 
 #' number of predictors. Hence, we recommend this technique only for small sets
 #' of preselected predictor variables.
@@ -60,6 +60,26 @@ bestPRESS <- function(target, predictors, data) {
   return(bestPredictors)
 }
 
+#' Alternative implementation which outputs a matrix with best predictors for
+#' each subset size
+#' 
+#' @param target Name of the target variable in the linear model
+#' @param predictors A vector of strings with predictor names
+#' @param data Dataframe that contains measurements for the target and all 
+
+bestPRESS_df <- function(target, predictors, data) {
+  nModels <- 2**length(predictors)
+  modelCodes <- seq(0, nModels - 1)
+  presses <- sapply(X=modelCodes, FUN=computePRESS, target, predictors, data)
+  nrPredictors <- unlist(lapply(sapply(X=modelCodes, FUN=selectPredictors, predictors), FUN = length))
+  presses_predictors_df = data.frame(modelCodes, presses, nrPredictors)
+  minCode_nrPredictors <- presses_predictors_df %>% arrange(nrPredictors, presses) %>% distinct(nrPredictors, .keep_all = T)
+  bestPredictors <- sapply(X=minCode_nrPredictors$modelCodes, FUN = selectPredictors, predictors)
+  bestPredictorsdf <- data.frame(do.call(rbind, bestPredictors))
+  bestPredictorsdf[upper.tri(bestPredictorsdf)] <- NA
+  return(bestPredictorsdf)
+}
+
 # DEMO
 data <- read.table("data/case1_bodyfat.txt", header = T, sep = ";")
 target <- "siri"
@@ -67,17 +87,9 @@ target <- "siri"
 # compute best subset of predictors for a lm after manual pre-selection
 predictors <- c("age", "weight_kg", "height_cm", "neck", "chest", "abdomen",
                 "hip", "thigh", "knee", "ankle", "biceps", "forearm", "wrist")
+
 bestPRESS(target, predictors, data)
 
+bestPRESS_df(target, predictors, data)
 
 
-# alternative method with printing best subset for every subset size
-nModels <- 2**length(predictors)
-modelCodes <- seq(0, nModels - 1)
-presses <- sapply(X=modelCodes, FUN=computePRESS, target, predictors, data)
-nrPredictors <- unlist(lapply(sapply(X=modelCodes, FUN=selectPredictors, predictors), FUN = length))
-presses_predictors_df = data.frame(modelCodes, presses, nrPredictors)
-minCode_nrPredictors <- presses_predictors_df %>% arrange(nrPredictors, presses) %>% distinct(nrPredictors, .keep_all = T)
-bestPredictors <- sapply(X=minCode_nrPredictors$modelCodes, FUN = selectPredictors, predictors)
-bestPredictorsdf <- data.frame(do.call(rbind, bestPredictors))
-bestPredictorsdf[upper.tri(bestPredictorsdf)] <- NA
