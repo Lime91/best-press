@@ -91,5 +91,3 @@ predictors <- c("age", "weight_kg", "height_cm", "neck", "chest", "abdomen",
 bestPRESS(target, predictors, data)
 
 bestPRESS_df(target, predictors, data)
-
-
