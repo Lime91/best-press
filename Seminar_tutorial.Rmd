@@ -161,10 +161,13 @@ Although, already using the more efficient calculation of PRESS by use of the ha
 
 In order to test the performance of the selection algorithm based on PRESS, a comparison with other criteria within best subset selection is done in this chapter. For comparison the package *leaps* is used.
 
-```{r}
+```{r, echo=T, eval=T}
 
-#         models <- regsubsets(glucagon~., data = dat.best.sub, nvmax = 4, method = "exhaustive", force.in = 2, nbest = 2)
-#         summary(models)
+form = as.formula(paste(target,"~",paste(predictors, collapse = "+")))
+models <- regsubsets(form, data = data, method = "backward", nbest = 1)
+summary(models)
+
+
 ```
 
 
