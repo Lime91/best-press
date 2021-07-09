@@ -21,13 +21,31 @@ Although the basic procedures like **backward** or **forward elimination** exist
   + the range of subset sizes you want to find best subsets on (optional).
 2. The algorithm finds the *best* subset of variables for each subset size according to the defined criteria. 
  
-The selection process shows why the computational effort should not be underestimated. For a working set of $10$ variables, $2^10$ models have to be calculated in order to find the *best* according to a given criteria. 
+The selection process shows why the computational effort should not be underestimated. For a working set of $10$ variables, $2^{10}$ models have to be calculated in order to find the *best* according to a given criteria. 
 
 Before referring to **Allen's PRESS-statistic** we want to give a short overview of other common, already named, criteria:
 
-* **AIC* (Akaike's information criteria): $AIC = -2l()
+* **AIC** (Akaike's information criteria): $AIC = -2l(\hat{\theta}_{ML})+2k$ with $k$ denoting the number of explanatory variables in the model and $l(\hat{\theta}_{ML})$ describing the log-likelihood of the vector $\theta$ which includes $k$ coefficients that result from the maximum-likelihood-estimation. In the case of linear models the AIC can be calculated directly as $AIC = n\cdot ln(\sigma^2)+2k$. [1]
+* **BIC** (Bayesian information criteria): $BIC = -2l(\hat{\theta}_{ML})+k\cdot ln(n)$. AIC and BIC differ only regarding the penalty term. While AIC always adds $2k$, BIC considers sample size $n$. It can be concluded that for $n>7$ ($ln(8)>2$), BIC is larger than AIC. [1]
+* **evtl. noch weiteres Maß**
+
+The idea behind these measures is to reward a good model fit and punish for model complexity. The difference to the **PRESS-statistc** is, that a good model fit is assessed different. Instead of maximum-likelihood-estimation, the goodness of prediction for every point in the data set is assessed in the following way: 
+
+$$\begin{aligned}PRESS = \sum_{i=1}^{n}(Y-\hat{Y_i})^2\end{aligned}$$ with $\hat{Y_i}$ describing $E(Y_i)$ excluding the $i$-th observation. In other words: For every point $i$ in the data set, the goodness of prediction of a model which is based on the remaining $n-1$ data points is calculated (as squared difference between the actual and predicted value). The sum of these predicted errors is then describing the PRESS-statistic which stands for **PRE**diction **S**um of **S**quares. [2]
+
+Although this criterion is not one of the latest findings, there is a connection to a very actual topic: Artificial intelligence. Here, the PRESS-statistic is equivalent to a special case of cross validation, the *leave-one-out* cross validation. The standard procedure follows three steps:
+
+1. Split the data set into $n$ so-called *folds* (*n-fold* cross validation).
+2. Combine $n-1$ folds to a training data set, build a model (in AI often a classifier or similar) on it and test it on the $n$-th fold.
+3. Do this for all folds and average the error.
+
+Now, leave-one-out cross validation also follows the described steps with the difference that one fold consists of only one data point. This method is also referred to in the literature as the *Jackknife* method. [3]
 
 
 
+# Sources
 
+1. Sachs, L., & Hedderich, J. (2006). Angewandte Statistik: Methodensammlung mit R. Springer-Verlag.
+2. Allen, D. M. (1974). The relationship between variable selection and data agumentation and a method for prediction. technometrics, 16(1), 125-127.
+3. Kruse, R., Borgelt, C., Braune, C., Mostaghim, S., Steinbrecher, M., Klawonn, F., & Moewes, C. (2011). Computational intelligence. Vieweg+ Teubner Verlag.
 
