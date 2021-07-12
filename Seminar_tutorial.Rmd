@@ -12,6 +12,9 @@ library(dplyr)
 library(kableExtra)
 library(formatR)
 library(leaps)
+library(stringr)
+library(bestglm)
+library(MASS)
 opts <- options(knitr.kable.NA = "")
 ```
 
@@ -35,7 +38,7 @@ Before referring to **Allen's PRESS-statistic** we want to give a short overview
 
 * **AIC** (Akaike's information criteria): $AIC = -2l(\hat{\theta}_{ML})+2k$ with $k$ denoting the number of explanatory variables in the model and $l(\hat{\theta}_{ML})$ describing the log-likelihood of the vector $\theta$ which includes $k$ coefficients that result from the maximum-likelihood-estimation. In the case of linear models the AIC can be calculated directly as $AIC = n\cdot ln(\sigma^2)+2k$. [1]
 * **BIC** (Bayesian information criteria): $BIC = -2l(\hat{\theta}_{ML})+k\cdot ln(n)$. AIC and BIC differ only regarding the penalty term. While AIC always adds $2k$, BIC considers sample size $n$. It can be concluded that for $n>7$ ($ln(8)>2$), BIC is larger than AIC. [1]
-* **evtl. noch weiteres Maß**
+
 
 The idea behind these measures is to reward a good model fit and punish for model complexity. The difference to the **PRESS-statistc** is, that a good model fit is assessed different. Instead of maximum-likelihood-estimation, the goodness of prediction for every point in the data set is assessed in the following way: 
 
@@ -100,7 +103,7 @@ computePRESS <- function(code, target, predictors, data) {
 }
 ```
 * *bestPRESS* selects best model (according to PRESS) per subset size and outputs it as matrix
-```{r, echo=T, eval=T, warning=F, message=F, tidy=TRUE, tidy.opts=list(width.cutoff=I(60))}
+```{r, echo=T, eval=T, warning=F, message=F, tidy=TRUE, tidy.opts=list(width.cutoff=I(90))}
 
 #' @param target Name of the target variable in the linear model
 #' @param predictors A vector of strings with predictor names
@@ -120,9 +123,11 @@ bestPRESS_df <- function(target, predictors, data) {
 }
 ```
 
-## Application on real data
+\pagebreak
 
-It follows a short demonstration based on a dataset on bodyfat.
+## Application on real life data
+
+It follows a short demonstration based on a data set on bodyfat.
 
 ```{r, echo=F, eval=T, message=F, warning=F, include=T}
 data <- read.table("data/case1_bodyfat.txt", header = T, sep = ";")
@@ -135,7 +140,7 @@ Applying the algorithm only consists of two steps:
 1. Select dependent and independent variables.
 2. Start the algorithm with the function *bestPRESS* and pass the selected variables and the data set to the function.
 
-```{r, echo=T, eval=T, message=F, warning=F, tidy=TRUE, tidy.opts=list(width.cutoff=I(60)), include=T}
+```{r, echo=T, eval=T, message=F, warning=F, tidy=TRUE, tidy.opts=list(width.cutoff=I(90)), include=T}
 
 # dependent variable
 target <- "siri"
@@ -147,6 +152,9 @@ predictors <- c("age", "weight_kg", "height_cm", "neck", "chest", "abdomen",
 start.time = Sys.time()
 best_subsets = bestPRESS_df(target, predictors, data)
 end.time = Sys.time()
+
+
+
 ```
 
 The result shows a matrix consisting the best model according to the PRESS-statistic for each subset size:
@@ -155,29 +163,143 @@ The result shows a matrix consisting the best model according to the PRESS-stati
 kable(best_subsets, format = "latex") %>% kable_styling(latex_options = "scale_down")
 ```
 
-Although, already using the more efficient calculation of PRESS by use of the hat matrix the execution for a data set with `r dim(data)[1]` rows and `r length(predictors)` explanatory variables already takes `r round(end.time - start.time,2)` seconds.
+Although, already using the more efficient calculation of PRESS by use of the hat matrix the execution for a data set with `r dim(data)[1]` rows and `r length(predictors)` explanatory variables takes `r round(end.time - start.time,2)` seconds.
 
-# Comparison to other algorithms
+## Application on artificial data
 
-In order to test the performance of the selection algorithm based on PRESS, a comparison with other criteria within best subset selection is done in this chapter. For comparison the package *leaps* is used.
+In addition, the algorithm is applied on artificial data as well. The approach for data generation was taken from [6] and slightly modified.
 
 ```{r, echo=T, eval=T}
 
-form = as.formula(paste(target,"~",paste(predictors, collapse = "+")))
-models <- regsubsets(form, data = data, method = "backward", nbest = 1)
-summary(models)
+set.seed(1234)
+n.sample <- 100
+error <- rnorm(n.sample, 0, 0.8)
 
+x1 <- runif(n.sample, -2, 2)
+x2 <- runif(n.sample, -1, 4)
+x3 <- sample(c(0,1),n.sample, replace=T)
+x4 <- 0.8*x1 + rnorm(n.sample, 1, 0.5)
+x5 <- 0.4*x1 + rnorm(n.sample, 2, 0.5)
+x6 <- -0.5*x1 + rnorm(n.sample, 0, 0.5)
+x7 <- rnorm(n.sample, 2, 0.5)
+x8 <- 0.9*x2 + rnorm(n.sample, 0, 0.05)
+X <- matrix(NA, n.sample, 9)
+X[,1] <- x1
+X[,2] <- x2
+X[,3] <- x3
+X[,4] <- x4
+X[,5] <- x5
+X[,6] <- x6
+X[,7] <- x7
+X[,8] <- x8
+# true model
+X[,9] <- 10 + 0.5*x1 - 1*x2 + 3*x3 + error
+colnames(X) <- c("x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8","y")
+
+
+fit1 <- lm(y~., data = as.data.frame(X))
+summary(fit1)
+```
+
+It can be seen, that the selection algorithm is choosing x1,x2 and x3 as *best* explanatory variables which reflects the true model.
+
+```{r, echo=T, eval=T, message=F, warning=F, tidy=TRUE, tidy.opts=list(width.cutoff=I(90)), include=T}
+
+# dependent variable
+target_art <- "y"
+
+# compute best subset of predictors for a lm after manual pre-selection
+predictors_art <- c("x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8")
+
+best_subsets = bestPRESS_df(target_art, predictors_art, as.data.frame(X))
+```
+
+```{r, echo=F, eval=T}
+kable(best_subsets, format = "latex",col.names=NULL)
+```
+
+# Comparison to other algorithms
+
+In order to test the performance of the selection algorithm based on PRESS, a comparison with other criteria within best subset selection is done in this chapter. For comparison the package *leaps* is used. Comparison is done on both data sets.
+
+*Leaps* offers the possibility to find *nbest* models per subset size. Therefore the results can be compared easily for each size. Since information criteria (like AIC, BIC, DIC, ...) differ only in how model complexity is penalized, the *best* models found by the function *regsubsets* do not depend on which information criteria is used (because only models of same sizes are compared).
+
+```{r, echo=T, eval=T, include=T, tidy=TRUE, tidy.opts=list(width.cutoff=I(90))}
+
+form = as.formula(paste(target,"~",paste(predictors, collapse = "+")))
+models <- regsubsets(form, data = data, method = "exhaustive", nbest = 1, nvmax = length(predictors))
+```
+
+
+```{r, echo=F, eval=T}
+best_models = summary(models)$which[,-1]
+for(i in 1:dim(best_models)[2])
+{
+  best_models[,i]=str_replace(best_models[,i], pattern = "TRUE", colnames(best_models)[i])
+  best_models[,i]=str_replace(best_models[,i], pattern = "FALSE", NA_character_)
+}
+best_models = t(apply(best_models, MARGIN=1, function(x) x[order(match(x,predictors))]))
+colnames(best_models) = paste("X",seq(1:dim(best_models)[2]),sep="")
+
+kable(best_models, format = "latex") %>% kable_styling(latex_options = "scale_down")
 
 ```
 
 
+
+```{r, echo=T, eval=T, include=T, tidy=TRUE, tidy.opts=list(width.cutoff=I(90))}
+
+form = as.formula(paste(target_art,"~",paste(predictors_art, collapse = "+")))
+models <- regsubsets(form, data = as.data.frame(X), method = "exhaustive", nbest = 1, nvmax = length(predictors))
+```
+
+
+```{r, echo=F, eval=T}
+best_models = summary(models)$which[,-1]
+for(i in 1:dim(best_models)[2])
+{
+  best_models[,i]=str_replace(best_models[,i], pattern = "TRUE", colnames(best_models)[i])
+  best_models[,i]=str_replace(best_models[,i], pattern = "FALSE", NA_character_)
+}
+best_models = t(apply(best_models, MARGIN=1, function(x) x[order(match(x,predictors_art))]))
+colnames(best_models) = paste("X",seq(1:dim(best_models)[2]),sep="")
+
+kable(best_models, format = "latex",col.names=NULL)
+
+```
+
 # Conclusion
 
+The whole algorithm for using PRESS as criteria is implemented by three functions, where only the *bestPRESS* function is needed for execution. This guarantees an easy handling for all sorts of applications. The user only has to provide the data set (*data*) along with the information which variables are explanatory (*predictors*) and which is the dependent one (*target*). 
+
+For the bodyfat data set it could be shown that overall similar variables were selected in comparison to best subset selection with AIC/BIC/... Only 3/13 models were different. However, it cannot be validated how well variable selection performance was in general on this data set because no information about the true model was available. 
+
+The results for the artificial data set were even more similar to each other. Only 1/8 models were different between PRESS and AIC/BIC/... The increase on similarity could also be attributed to the rather low complexity of the data set.
+
+The main goal of this tutorial was to provide a working **best subset selection** algorithm with **PRESS** as selection criteria, which was done. For more detailed comparison with other selection algorithms further investigations would be needed.
 
 # Limitations
 
-* Interactions
-* Runtime
+* Interaction terms
+
+It has not yet been discussed how to deal with interaction terms. Although it needs some additional preparation, it is possible to add interactions within the *predictors*-vector by just combining the variable names with **:** as separator. For few interaction terms this can be done by hand. At some point *paste*-function can be useful to adapt the *predictors*-vector.
+
+```{r, echo=T,eval=T,include=T,warning=F,message=F}
+# example
+predictors <- c("age", "weight_kg", "height_cm", "neck", "chest", "abdomen",
+                "hip", "thigh", "knee", "ankle", "biceps", "forearm", "wrist","age:knee")
+
+best_subsets = bestPRESS_df(target, predictors, data)
+
+```
+
+```{r, echo=F, eval=T}
+kable(best_subsets, format = "latex") %>% kable_styling(latex_options = "scale_down")
+```
+
+* Algorithm runtime
+
+Variable selection is often performed in larger data sets. It was shown that with 13 explanatory variables the algorithm already takes some time. Since the number of models increases exponentially, it has to be checked if the usage of the algorithm is still feasible at some point.
 
 # Sources
 
@@ -186,3 +308,4 @@ summary(models)
 3. Kruse, R., Borgelt, C., Braune, C., Mostaghim, S., Steinbrecher, M., Klawonn, F., & Moewes, C. (2011). Computational intelligence. Vieweg+ Teubner Verlag.
 4. https://statisticaloddsandends.wordpress.com/2018/07/30/the-press-statistic-for-linear-regression/
 5. http://statweb.stanford.edu/~owen/courses/305a/305MinNotesMarked.pdf
+6. https://www.rpubs.com/lictof/480764
