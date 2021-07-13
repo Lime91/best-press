@@ -24,6 +24,22 @@ selectPredictors(3, p)  # selects "A" and "B"
 selectPredictors(5, p)  # selects "A" and "C"
 
 
+#' Count all bits in code that are set to 1.
+#'
+#' @param code An integer
+#' @param nBits number of least significant bits to be counted
+bitSum <- function(code, nBits=32) {
+  s <- 0
+  while (nBits > 0) {
+    if (code %% 2 == 1)  # check if current bit is set
+      s <- s + 1
+    code <- code %/% 2  # right shift to obtain next bit
+    nBits <- nBits - 1
+  }
+  return(s)
+}
+
+
 #' Compute PRESS for a set of predictors specified by the given code
 #' 
 #' @param code An integer in the interval [0, 2^length(predictors) - 1] that 
@@ -32,7 +48,7 @@ selectPredictors(5, p)  # selects "A" and "C"
 #' @param predictors A vector of strings with predictor names
 #' @param data Dataframe that contains measurements for the target and all 
 #' predictors
-computePRESS <- function(code, target, predictors, data) {
+computePress <- function(code, target, predictors, data) {
   p <- selectPredictors(code, predictors)
   if (is.null(p))  # empty model (iff code == 0)
     p <- "1"
@@ -51,33 +67,39 @@ computePRESS <- function(code, target, predictors, data) {
 #' @param predictors A vector of strings with predictor names
 #' @param data Dataframe that contains measurements for the target and all 
 #' predictors
-bestPRESS <- function(target, predictors, data) {
+bestPress <- function(target, predictors, data) {
   nModels <- 2**length(predictors)
   modelCodes <- seq(0, nModels - 1)
-  presses <- sapply(X=modelCodes, FUN=computePRESS, target, predictors, data)
+  presses <- sapply(X=modelCodes, FUN=computePress, target, predictors, data)
   minCode <- which.min(presses)
   bestPredictors <- selectPredictors(minCode, predictors)
   return(bestPredictors)
 }
 
-#' Alternative implementation which outputs a matrix with best predictors for
-#' each subset size
+
+#' Alternative implementation that computes a matrix with best predictors for
+#' each subset size.
 #' 
 #' @param target Name of the target variable in the linear model
 #' @param predictors A vector of strings with predictor names
 #' @param data Dataframe that contains measurements for the target and all 
-
-bestPRESS_df <- function(target, predictors, data) {
-  nModels <- 2**length(predictors)
-  modelCodes <- seq(0, nModels - 1)
-  presses <- sapply(X=modelCodes, FUN=computePRESS, target, predictors, data)
-  nrPredictors <- unlist(lapply(sapply(X=modelCodes, FUN=selectPredictors, predictors), FUN = length))
-  presses_predictors_df = data.frame(modelCodes, presses, nrPredictors)
-  minCode_nrPredictors <- presses_predictors_df %>% arrange(nrPredictors, presses) %>% distinct(nrPredictors, .keep_all = T)
-  bestPredictors <- sapply(X=minCode_nrPredictors$modelCodes, FUN = selectPredictors, predictors)
-  bestPredictorsdf <- data.frame(do.call(rbind, bestPredictors))
-  bestPredictorsdf[upper.tri(bestPredictorsdf)] <- NA
-  return(bestPredictorsdf)
+#' predictors
+bestPressDf <- function(target, predictors, data) {
+  nPred <- length(predictors)
+  nModels <- 2**nPred
+  modelCodes <- seq(1, nModels - 1)  # skip empty model
+  modelSizes <- sapply(X=modelCodes, FUN=bitSum, nPred)
+  presses <- sapply(X=modelCodes, FUN=computePress, target, predictors, data)
+  bestPredictorsDf <- data.frame(modelCodes, modelSizes, presses) %>% 
+    arrange(modelSizes, presses) %>%
+    distinct(modelSizes, .keep_all=T) %>% 
+    select(modelCodes) %>%
+    apply(1, selectPredictors, predictors) %>%  # sizes differ
+    lapply(function(v) c(v, rep(NA, nPred - length(v)))) %>%  # equal sizes
+    as.data.frame(row.names = paste("X", seq(nPred), sep = "")) %>% 
+    t()
+  rownames(bestPredictorsDf) <- seq(nPred)
+  return(bestPredictorsDf)
 }
 
 # DEMO
@@ -88,6 +110,13 @@ target <- "siri"
 predictors <- c("age", "weight_kg", "height_cm", "neck", "chest", "abdomen",
                 "hip", "thigh", "knee", "ankle", "biceps", "forearm", "wrist")
 
-bestPRESS(target, predictors, data)
+bestPress(target, predictors, data)
 
-bestPRESS_df(target, predictors, data)
+bestPressDf(target, predictors, data)
+
+
+
+
+
+
+
