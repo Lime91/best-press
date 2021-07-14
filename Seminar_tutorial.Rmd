@@ -1,7 +1,7 @@
 ---
 title: "Best subset variable selection based on Allen's PRESS-Statistic"
 author: "Sebastian Schütz, Konstantin Thiel"
-date: "09.07.2021"
+date: "14.07.2021"
 output: pdf_document
 ---
 
@@ -20,7 +20,9 @@ opts <- options(knitr.kable.NA = "")
 
 # Introduction
 
-Within this report variable selection based on **Allen's PRESS-statistic** is presented. Variable selection itself is a popular topic now more than ever. Due to increasing machine resources such variable selection algorithms, which are mostly already existing for a long time, are now possible to execute even on larger scale. The desire to find relations between variables based on algorithms has been present for some time too. It comes from the idea that selection based on algorithms is more objective and therefore in some way better. Another reason may be that one is getting the feeling that no connections were overlooked with such algorithms. It has already been found that variable selection based on algorithms is not automatically the best solution, nevertheless it can help to find a *good* set of variables to describe data. Although the basic procedures like **backward** or **forward elimination** exist for some time, there is still research done to improve or investigate these algorithms.
+Variable selection is a typical task in many data analysis projects. The goal is to find relations between variables based on *selection algorithms*. These algorithms are considered to be objective, and therefore, preferable to pure manual selection. Another appealing characteristic is the conception that algorithms are precise and do not overlook relationships between variables. However, it has been found that variable selection based on algorithms does not automatically yield the best solution [7]. Nevertheless, it can help to find a *good* set of variables to describe data. Although the basic procedures like *backward* or *forward selection* exist for many years, there is still research to improve or investigate these algorithms today.
+
+In this tutorial we present variable selection based on **Allen's PRESS-statistic**. Since powerful computers are widely used nowadays, we combine this criterion with the **best subset selection** algorithm, which is usually more expensive to evaluate that backward or forward selection. To the best of our knowledge, there is currently no `R`-package that implements the combination of PRESS with best subset selection. Thus, we contribute our own implementation of this technique.
 
 # Mathematical background
 
@@ -309,3 +311,4 @@ Variable selection is often performed in larger data sets. It was shown that wit
 4. https://statisticaloddsandends.wordpress.com/2018/07/30/the-press-statistic-for-linear-regression/
 5. http://statweb.stanford.edu/~owen/courses/305a/305MinNotesMarked.pdf
 6. https://www.rpubs.com/lictof/480764
+7. Heinze, G. and Dunkler D. (2017). Five myths about variable selection. Transplant International, (30), 6-10.
