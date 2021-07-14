@@ -1,6 +1,6 @@
 ---
 title: "Best subset variable selection based on Allen's PRESS-Statistic"
-author: "Sebastian Schütz, Konstantin Thiel"
+author: "Sebastian Schütz and Konstantin Thiel"
 date: "14.07.2021"
 output: pdf_document
 ---
@@ -47,18 +47,18 @@ Before introducing the PRESS-statistic we give a short overview of other common 
 * **BIC** (Bayesian information criteria): $BIC = -2l(\hat{\theta}_{ML})+k\cdot ln(n)$. AIC and BIC differ only with respect to the penalty term. While AIC always adds $2k$, BIC considers sample size $n$. It can be concluded that for $n>7$ ($ln(8)>2$), BIC is always larger than AIC [1].
 
 
-The rationale behind these two measures is to reward a good model fit and punish for model complexity. The **PRESS-statistic** assesses model quality in a different way. Instead of maximum-likelihood-estimation, the prediction quality for every point in the data set is estimated as follows:
-$$\begin{aligned}PRESS = \sum_{i=1}^{n}(y_i-\hat{y}_{-i})^2\end{aligned}$$ where $\hat{y}_{-i}$ denotes the estimated response value for the $i$-th observation based on a model computed with this observation omitted. In other words, for every point in the data set, the prediction quality of a model which is based on the remaining $n-1$ data points is evaluated (as squared difference between the actual and predicted value). The PRESS-statistic is defined as the sum of these errors. Its name stands for **PRE**diction **S**um of **S**quares [2].
+The rationale behind these two measures is to reward a good model fit and punish for model complexity. The **PRESS-statistic** assesses model quality in a different way. Instead of maximum-likelihood-estimation, the prediction quality for every point in the dataset is estimated as follows:
+$$\begin{aligned}PRESS = \sum_{i=1}^{n}(y_i-\hat{y}_{-i})^2\end{aligned}$$ where $\hat{y}_{-i}$ denotes the estimated response value for the $i$-th observation based on a model computed with this observation omitted. In other words, for every point in the dataset, the prediction quality of a model which is based on the remaining $n-1$ data points is evaluated (as squared difference between the actual and predicted value). The PRESS-statistic is defined as the sum of these errors. Its name stands for **PRE**diction **S**um of **S**quares [2].
 
 Although this criterion is not one of the latest findings, there is a connection to the currently trending topics of Machine Learning and AI. In these domains, the PRESS-statistic is equivalent to a special case of *cross validation*, a standard procedure that follows three steps:
 
-1. Split the data set into $n$ so-called *folds* (*n-fold* cross validation).
-2. Combine $n-1$ folds to a training data set, build a model (in AI often a classifier or similar) on it and test it on the $n$-th fold.
+1. Split the dataset into $n$ so-called *folds* (*n-fold* cross validation).
+2. Combine $n-1$ folds to a training dataset, build a model (in AI often a classifier or similar) on it and test it on the $n$-th fold.
 3. Do this for all folds and average the error.
 
 Computing PRESS also follows the described steps with the difference that one fold consists of only one data point. In the literature, the method is also referred to as the *leave-one-out* cross validation or *Jackknife* method [3].
 
-For large data sets, the computation of PRESS according to the three steps listed above is cumbersome. According to the description we would need to fit a separate model for every data point. However, this problem can be circumvented for linear models by exploiting the hat matrix $H=X(X^TX)^{-1}X^T$ to calculate $\hat{y}_{-i}$ in the following way: If $H_{ii}$ denotes the $i$-th diagonal entry of $H$, we have:
+For large datasets, the computation of PRESS according to the three steps listed above is cumbersome. According to the description we would need to fit a separate model for every data point. However, this problem can be circumvented for linear models by exploiting the hat matrix $H=X(X^TX)^{-1}X^T$ to calculate $\hat{y}_{-i}$ in the following way: If $H_{ii}$ denotes the $i$-th diagonal entry of $H$, we have:
 $$\begin{aligned}\hat{y}_{-i} = \frac{\hat{y}_{i}-H_{ii}y_i}{1-H_{ii}}\end{aligned}$$ From this it follows: $$\begin{aligned}PRESS = \sum_{i=1}^n \frac{(y_i-\hat{y}_i)^2}{(1-H_{ii})^2}\end{aligned}$$ In other words, \underline{only one linear model has to be built} to compute PRESS. This makes the combination of PRESS with best subset selection feasible and we use this approach also in our implementation in the subsequent section. A more detailed mathematical explanation can be found in [4][5].
 
 # Implementation in `R`
@@ -129,11 +129,11 @@ bestPressDf <- function(target, predictors, data) {
   nPred <- length(predictors)
   nModels <- 2**nPred
   modelCodes <- seq(1, nModels - 1)  # skip empty model
-  modelSizes <- sapply(X=modelCodes, FUN=bitSum, nPred)
-  presses <- sapply(X=modelCodes, FUN=computePress, target, predictors, data)
+  modelSizes <- sapply(modelCodes, bitSum, nPred)
+  presses <- sapply(modelCodes, computePress, target, predictors, data)
   bestCodes <- data.frame(modelCodes, modelSizes, presses) %>% 
     arrange(modelSizes, presses) %>%
-    distinct(modelSizes, .keep_all=T) %>% 
+    distinct(modelSizes, .keep_all = T) %>% 
     dplyr::select(modelCodes)  # namespace only needed for RMarkdown
   bestPred <- apply(bestCodes, 1, selectPredictors, predictors)  # sizes differ
   bestDf <- lapply(bestPred, function(v) c(v, rep(NA, nPred - length(v)))) %>% 
@@ -144,9 +144,9 @@ bestPressDf <- function(target, predictors, data) {
 }
 ```
 
-## Application on Real-World Data
+## Application to Real-World Data
 
-It follows a short demonstration based on a data set on bodyfat.
+We provide a short demonstration based on a dataset on body fat introduced in [8].
 
 ```{r, echo=F, eval=T, message=F, warning=F, include=T}
 data <- read.table("data/case1_bodyfat.txt", header = T, sep = ";")
@@ -156,39 +156,33 @@ kable(head(data), format = "latex", booktabs = TRUE) %>%
 
 Applying the algorithm only consists of two steps:
 
-1. Select dependent and independent variables.
-2. Start the algorithm with the function `bestPressDf` and pass the selected variables and the data set to the function.
+1. Select target and explanatory variables.
+2. Start the algorithm with the function `bestPressDf` and pass the selected variables and the dataset to the function.
 
 ```{r, echo=T, eval=T, message=F, warning=F, tidy=TRUE, tidy.opts=list(width.cutoff=I(90)), include=T}
 
-# dependent variable
 target <- "siri"
+predictors <- c("age", "weight_kg", "height_cm", "neck", "chest", "abdomen",
+                "hip", "thigh", "knee", "ankle", "biceps", "forearm", "wrist")
 
 # compute best subset of predictors for a lm after manual pre-selection
-predictors <- c("age", "weight_kg", "height_cm", "neck", "chest", "abdomen")
-#predictors <- c("age", "weight_kg", "height_cm", "neck", "chest", "abdomen",
-#                "hip", "thigh", "knee", "ankle", "biceps", "forearm", "wrist")
-
-
 start.time = Sys.time()
 best_subsets = bestPressDf(target, predictors, data)
 end.time = Sys.time()
-
-
-
 ```
 
-The result shows a matrix consisting the best model according to the PRESS-statistic for each subset size:
+The result shows a matrix consisting of the best model for each subset size according to the PRESS-statistic:
 
 ```{r, echo=F, eval=T}
-kable(best_subsets, format = "latex") %>% kable_styling(latex_options = "scale_down")
+kable(best_subsets, format = "latex") %>%
+  kable_styling(latex_options = "scale_down")
 ```
 
-Although, already using the more efficient calculation of PRESS by use of the hat matrix the execution for a data set with `r dim(data)[1]` rows and `r length(predictors)` explanatory variables takes `r round(end.time - start.time,2)` seconds.
+Although we already compute PRESS efficiently by exploiting the hat matrix, the execution for the provided dataset with `r dim(data)[1]` rows and `r length(predictors)` explanatory variables takes `r round(end.time - start.time, 2)` seconds on the machine that is used to compile this tutorial.
 
-## Application on artificial data
+## Application to Artificial Data
 
-In addition, the algorithm is applied on artificial data as well. The approach for data generation was taken from [6] and slightly modified.
+We apply the technique to artificially generated data. The data generation was taken from [6] and slightly modified for our purposes.
 
 ```{r, echo=T, eval=T}
 
@@ -213,44 +207,50 @@ X[,5] <- x5
 X[,6] <- x6
 X[,7] <- x7
 X[,8] <- x8
+
 # true model
 X[,9] <- 10 + 0.5*x1 - 1*x2 + 3*x3 + error
-colnames(X) <- c("x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8","y")
+colnames(X) <- c("x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8", "y")
 
-
+# full model
 fit1 <- lm(y~., data = as.data.frame(X))
 summary(fit1)
 ```
 
-It can be seen, that the selection algorithm is choosing x1,x2 and x3 as *best* explanatory variables which reflects the true model.
+A full model that includes all available variables yields that only one of the true predictor variables is significant at $\alpha = 0.05$. Thus, we apply our selection technique to investigate whether we are able to recover the true model.
+\linebreak
 
 ```{r, echo=T, eval=T, message=F, warning=F, tidy=TRUE, tidy.opts=list(width.cutoff=I(90)), include=T}
 
-# dependent variable
 target_art <- "y"
-
-# compute best subset of predictors for a lm after manual pre-selection
 predictors_art <- c("x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8")
-
 best_subsets = bestPressDf(target_art, predictors_art, as.data.frame(X))
 ```
 
 ```{r, echo=F, eval=T}
-kable(best_subsets, format = "latex",col.names=NULL)
+kable(best_subsets, format = "latex", col.names=NULL)
 ```
+
+The selection algorithm chooses `x1`, `x2` and `x3` as *best* explanatory variables for a model of size 3. This reflects the true model.
 
 # Comparison to other algorithms
 
-In order to test the performance of the selection algorithm based on PRESS, a comparison with other criteria within best subset selection is done in this chapter. For comparison the package *leaps* is used. Comparison is done on both data sets.
-
-*Leaps* offers the possibility to find *nbest* models per subset size. Therefore the results can be compared easily for each size. Since information criteria (like AIC, BIC, DIC, ...) differ only in how model complexity is penalized, the *best* models found by the function *regsubsets* do not depend on which information criteria is used (because only models of same sizes are compared).
+In order to test the performance of the selection algorithm based on PRESS, we perform a comparison with other criteria in this chapter. We use the package `leaps` that provides a best subset selection technique based on likelihood information criteria. Our comparison is performed on both the body fat and the artificial dataset.
+Note that the various information criteria (AIC, BIC, DIC, ...) differ only in how model complexity is penalized. Thus, if we fix the model size, the *best* model is independent of the choice of a specific information criterion.
 
 ```{r, echo=T, eval=T, include=T, tidy=TRUE, tidy.opts=list(width.cutoff=I(90))}
 
-form = as.formula(paste(target,"~",paste(predictors, collapse = "+")))
-models <- regsubsets(form, data = data, method = "exhaustive", nbest = 1, nvmax = length(predictors))
+form = as.formula(paste(target, "~", paste(predictors, collapse = "+")))
+models <- regsubsets(form,
+                     data = data,
+                     method = "exhaustive",
+                     nbest = 1,
+                     nvmax = length(predictors)
+)
 ```
 
+NB: `method = "exhaustive"` corresponds to best subset selection; `nbest = 1` means that only one model for each subset size is reported; `nvmax = length(predictors)` determines that all possible subset sizes are investigated.
+\newline
 
 ```{r, echo=F, eval=T}
 best_models = summary(models)$which[,-1]
@@ -270,8 +270,13 @@ kable(best_models, format = "latex") %>% kable_styling(latex_options = "scale_do
 
 ```{r, echo=T, eval=T, include=T, tidy=TRUE, tidy.opts=list(width.cutoff=I(90))}
 
-form = as.formula(paste(target_art,"~",paste(predictors_art, collapse = "+")))
-models <- regsubsets(form, data = as.data.frame(X), method = "exhaustive", nbest = 1, nvmax = length(predictors))
+form = as.formula(paste(target_art, "~", paste(predictors_art, collapse = "+")))
+models <- regsubsets(form,
+                     data = as.data.frame(X),
+                     method = "exhaustive",
+                     nbest = 1,
+                     nvmax = length(predictors)
+)
 ```
 
 
@@ -291,13 +296,13 @@ kable(best_models, format = "latex",col.names=NULL)
 
 # Conclusion
 
-The whole algorithm for using PRESS as criteria is implemented by three functions, where only the *bestPRESS* function is needed for execution. This guarantees an easy handling for all sorts of applications. The user only has to provide the data set (*data*) along with the information which variables are explanatory (*predictors*) and which is the dependent one (*target*). 
+We implemented an algorithm that uses PRESS as criterion for variable selection in linear models. This required only a few functions with `bestPressDf` providing a simple API for users. The function suggests the best set of variables for each possible model size. Users must only provide a dataset (`data`) along with the information of which variables are explanatory (`predictors`) and which is the dependent one (`target`). 
 
-For the bodyfat data set it could be shown that overall similar variables were selected in comparison to best subset selection with AIC/BIC/... Only 3/13 models were different. However, it cannot be validated how well variable selection performance was in general on this data set because no information about the true model was available. 
+On the bodyfat dataset, we could show that PRESS selected similar subsets in comparison to a selection based on a likelihood criterion (AIC, BIC, ...). Only 3/13 models suggested by both algorithms were different. However, it cannot be stated how close any of the suggested models is to the true model since there is no information about a true model for this dataset. 
 
-The results for the artificial data set were even more similar to each other. Only 1/8 models were different between PRESS and AIC/BIC/... The increase on similarity could also be attributed to the rather low complexity of the data set.
+The results for the artificial dataset were even more similar to each other. Only 1/8 models was different between PRESS and the likelihood criteria. This increase in similarity might be attributed to the rather low complexity of the artificial dataset.
 
-The main goal of this tutorial was to provide a working **best subset selection** algorithm with **PRESS** as selection criteria, which was done. For more detailed comparison with other selection algorithms further investigations would be needed.
+The main goal of this tutorial was to provide a working **best subset selection** algorithm based on **PRESS** as selection criterion, which was achieved. For a more detailed comparison with other selection algorithms we recommend to conduct further investigations.
 
 # Limitations
 
@@ -310,7 +315,7 @@ It has not yet been discussed how to deal with interaction terms. Although it ne
 predictors <- c("age", "weight_kg", "height_cm", "neck", "chest", "abdomen",
                 "hip", "thigh", "knee", "ankle", "biceps", "forearm", "wrist","age:knee")
 
-#best_subsets = bestPressDf(target, predictors, data)
+best_subsets = bestPressDf(target, predictors, data)
 
 ```
 
@@ -320,9 +325,9 @@ kable(best_subsets, format = "latex") %>% kable_styling(latex_options = "scale_d
 
 * Algorithm runtime
 
-Variable selection is often performed in larger data sets. It was shown that with 13 explanatory variables the algorithm already takes some time. Since the number of models increases exponentially, it has to be checked if the usage of the algorithm is still feasible at some point.
+Variable selection is often performed in larger datasets. It was shown that with 13 explanatory variables the algorithm already takes some time. Since the number of models increases exponentially, it has to be checked if the usage of the algorithm is still feasible at some point.
 
-# Sources
+# References
 
 1. Sachs, L., & Hedderich, J. (2006). Angewandte Statistik: Methodensammlung mit R. Springer-Verlag.
 2. Allen, D. M. (1974). The relationship between variable selection and data agumentation and a method for prediction. technometrics, 16(1), 125-127.
@@ -330,4 +335,5 @@ Variable selection is often performed in larger data sets. It was shown that wit
 4. https://statisticaloddsandends.wordpress.com/2018/07/30/the-press-statistic-for-linear-regression/
 5. http://statweb.stanford.edu/~owen/courses/305a/305MinNotesMarked.pdf
 6. https://www.rpubs.com/lictof/480764
-7. Heinze, G. and Dunkler D. (2017). Five myths about variable selection. Transplant International, (30), 6-10.
+7. Heinze, G. and Dunkler D. (2017). Five myths about variable selection. Transplant International (30), 6-10.
+8. Heinze, G., Wallisch, C., and Dunkler D. (2017). Variable selection – A review and recommendations for the practicing statistician. Biometrical Journal (60), 431-449.
