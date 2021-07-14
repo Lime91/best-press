@@ -5,6 +5,7 @@ date: "14.07.2021"
 output: pdf_document
 ---
 
+
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(MPV)
@@ -22,59 +23,60 @@ opts <- options(knitr.kable.NA = "")
 
 Variable selection is a typical task in many data analysis projects. The goal is to find relations between variables based on *selection algorithms*. These algorithms are considered to be objective, and therefore, preferable to pure manual selection. Another appealing characteristic is the conception that algorithms are precise and do not overlook relationships between variables. However, it has been found that variable selection based on algorithms does not automatically yield the best solution [7]. Nevertheless, it can help to find a *good* set of variables to describe data. Although the basic procedures like *backward* or *forward selection* exist for many years, there is still research to improve or investigate these algorithms today.
 
-In this tutorial we present variable selection based on **Allen's PRESS-statistic**. Since powerful computers are widely used nowadays, we combine this criterion with the **best subset selection** algorithm, which is usually more expensive to evaluate that backward or forward selection. To the best of our knowledge, there is currently no `R`-package that implements the combination of PRESS with best subset selection. Thus, we contribute our own implementation of this technique.
+In this tutorial we present variable selection for linear models based on **Allen's PRESS-statistic**. Since powerful computers are widely used nowadays, we combine this criterion with the **best subset selection** algorithm, which is usually more expensive to evaluate that backward or forward selection. To the best of our knowledge, there is currently no `R`-package that implements the combination of PRESS with best subset selection. Thus, we contribute our own implementation of this technique.
 
-# Mathematical background
+# Fundamentals
 
-Within this tutorial the **best subset selection**, a very common approach will be applied. This algorithm is often based on criteria like **AIC, BIC, R-squared**, ... Especially for this way of variable selection increasing machine resources are important. The procedure is as follows: 
+## Best Subset Selection
+
+Best subset selection uses a model *quality criterion* such as *AIC, BIC, R-squared* or, in our case, the PRESS statistic. The algorithm works as follows: 
 
 1. Define ...
-  + the criteria on which the selection process is based on.
-  + the set of variables selection should be done on.
-  + the range of subset sizes you want to find best subsets on (optional).
-2. The algorithm finds the *best* subset of variables for each subset size according to the defined criteria. 
+  + the criterion on which the selection process is based on.
+  + the set of variables from which to select.
+  + the range of different subset sizes to investigate (optional).
+2. The algorithm selects the *best* subset of variables for each subset size according to the defined criterion. 
  
-The selection process shows why the computational effort should not be underestimated. For a working set of $10$ variables, $2^{10}$ models have to be calculated in order to find the *best* according to a given criteria. 
+The computational effort of this algorithm should not be underestimated. For a set of $10$ variables, $2^{10}$ models have to be evaluated in order to find the best one according to the criterion, i.e., the number of models to be evaluated grows exponentially (!) in the variable set size. Therefore, we suggest this technique only for small to medium sets of variables and recommend users to perform a manual preselection (e.g., based on domain expert knowledge) beforehand.
 
-Before referring to **Allen's PRESS-statistic** we want to give a short overview of other common criteria:
+## Model Quality Criteria
 
-* **AIC** (Akaike's information criteria): $AIC = -2l(\hat{\theta}_{ML})+2k$ with $k$ denoting the number of explanatory variables in the model and $l(\hat{\theta}_{ML})$ describing the log-likelihood of the vector $\theta$ which includes $k$ coefficients that result from the maximum-likelihood-estimation. In the case of linear models the AIC can be calculated directly as $AIC = n\cdot ln(\sigma^2)+2k$. [1]
-* **BIC** (Bayesian information criteria): $BIC = -2l(\hat{\theta}_{ML})+k\cdot ln(n)$. AIC and BIC differ only regarding the penalty term. While AIC always adds $2k$, BIC considers sample size $n$. It can be concluded that for $n>7$ ($ln(8)>2$), BIC is larger than AIC. [1]
+Before introducing the PRESS-statistic we give a short overview of other common criteria:
+
+* **AIC** (Akaike's information criteria): $AIC = -2l(\hat{\theta}_{ML})+2k$ where $k$ denotes the number of explanatory variables in the model and $l(\hat{\theta}_{ML})$ describes the log-likelihood of the vector $\theta$ which includes $k$ coefficients that result from the maximum-likelihood-estimation. In the case of linear models, the AIC can be computed directly as $AIC = n\cdot ln(\sigma^2)+2k$ [1].
+* **BIC** (Bayesian information criteria): $BIC = -2l(\hat{\theta}_{ML})+k\cdot ln(n)$. AIC and BIC differ only with respect to the penalty term. While AIC always adds $2k$, BIC considers sample size $n$. It can be concluded that for $n>7$ ($ln(8)>2$), BIC is always larger than AIC [1].
 
 
-The idea behind these measures is to reward a good model fit and punish for model complexity. The difference to the **PRESS-statistc** is, that a good model fit is assessed different. Instead of maximum-likelihood-estimation, the goodness of prediction for every point in the data set is assessed in the following way: 
+The rationale behind these two measures is to reward a good model fit and punish for model complexity. The **PRESS-statistic** assesses model quality in a different way. Instead of maximum-likelihood-estimation, the prediction quality for every point in the data set is estimated as follows:
+$$\begin{aligned}PRESS = \sum_{i=1}^{n}(y_i-\hat{y}_{-i})^2\end{aligned}$$ where $\hat{y}_{-i}$ denotes the estimated response value for the $i$-th observation based on a model computed with this observation omitted. In other words, for every point in the data set, the prediction quality of a model which is based on the remaining $n-1$ data points is evaluated (as squared difference between the actual and predicted value). The PRESS-statistic is defined as the sum of these errors. Its name stands for **PRE**diction **S**um of **S**quares [2].
 
-$$\begin{aligned}PRESS = \sum_{i=1}^{n}(y_i-\hat{y}_{-i})^2\end{aligned}$$ with $\hat{y_{-i}}$ describing the expected value excluding the $i$-th observation. In other words: For every point in the data set, the goodness of prediction of a model which is based on the remaining $n-1$ data points is calculated (as squared difference between the actual and predicted value). The sum of these predicted errors is then describing the PRESS-statistic which stands for **PRE**diction **S**um of **S**quares. [2]
-
-Although this criterion is not one of the latest findings, there is a connection to a very actual topic: Artificial intelligence. Here, the PRESS-statistic is equivalent to a special case of cross validation, the *leave-one-out* cross validation. The standard procedure follows three steps:
+Although this criterion is not one of the latest findings, there is a connection to the currently trending topics of Machine Learning and AI. In these domains, the PRESS-statistic is equivalent to a special case of *cross validation*, a standard procedure that follows three steps:
 
 1. Split the data set into $n$ so-called *folds* (*n-fold* cross validation).
 2. Combine $n-1$ folds to a training data set, build a model (in AI often a classifier or similar) on it and test it on the $n$-th fold.
 3. Do this for all folds and average the error.
 
-Now, leave-one-out cross validation also follows the described steps with the difference that one fold consists of only one data point. This method is also referred to in the literature as the *Jackknife* method. [3]
+Computing PRESS also follows the described steps with the difference that one fold consists of only one data point. In the literature, the method is also referred to as the *leave-one-out* cross validation or *Jackknife* method [3].
 
-Especially for larger data sets calculation of PRESS-statistic is cumbersome. According to the description one would need to fit a separate model for every data point in order to estimate the outcome. However, this problem can be circumvented for linear models by using the hat matrix $H=X(X^TX)^{-1}X^T$ to calculate $\hat{y}_{-i}$ in the following way: If $H_{ii}$ denotes the $i$-th diagonal entry of $H$,
-$$\begin{aligned}\hat{y}_{-i} = \frac{\hat{y}_{i}-H_{ii}y_i}{1-H_{ii}}\end{aligned}$$ From there it follows, that $$\begin{aligned}PRESS = \sum_{i=1}^n \frac{(y_i-\hat{y}_i)^2}{(1-H_{ii})^2}\end{aligned}$$ That means, that only one linear model has to be built for all $n$ data points. This approach is also used in the following tutorial. A more detailed mathematical explanation can be found here [4][5].
+For large data sets, the computation of PRESS according to the three steps listed above is cumbersome. According to the description we would need to fit a separate model for every data point. However, this problem can be circumvented for linear models by exploiting the hat matrix $H=X(X^TX)^{-1}X^T$ to calculate $\hat{y}_{-i}$ in the following way: If $H_{ii}$ denotes the $i$-th diagonal entry of $H$, we have:
+$$\begin{aligned}\hat{y}_{-i} = \frac{\hat{y}_{i}-H_{ii}y_i}{1-H_{ii}}\end{aligned}$$ From this it follows: $$\begin{aligned}PRESS = \sum_{i=1}^n \frac{(y_i-\hat{y}_i)^2}{(1-H_{ii})^2}\end{aligned}$$ In other words, \underline{only one linear model has to be built} to compute PRESS. This makes the combination of PRESS with best subset selection feasible and we use this approach also in our implementation in the subsequent section. A more detailed mathematical explanation can be found in [4][5].
 
-# Implementation in R
+# Implementation in `R`
 
 ## Framework/structure
 
-For implementation in R two packages were used:
+Our implementation uses two `R`-packages:
 
-* **MPV** for calculation of the PRESS-statistic
-* **dplyr** for data preparation
+* `MPV` for calculation of the PRESS-statistic
+* `dplyr` for data handling
 
-Furthermore three functions were defined:
+We define the following functions:
 
-* *selectPredictors* selects a subset of the explanatory variables based on an integer
+#### selectPredictors
+
+Return the set of variable names (a subset of `predictors`) that are encoded in an integer `code`. Each bit in `code` represents a single variable. Hence, `code` must be in the interval `[0, 2^length(predictors) - 1]`.
+
 ```{r, echo=T, eval=T, warning=F, message=F}
-#' Extract predictor names from bitcode.
-#'
-#' @param code An integer in the interval [0, 2^length(predictors) - 1] that 
-#' encodes the selected predictors
-#' @param predictors A vector of strings with predictor names
 selectPredictors <- function(code, predictors) {
   selected <- c()
   for (i in 1:length(predictors)) {
@@ -85,17 +87,30 @@ selectPredictors <- function(code, predictors) {
   return(selected)
 }
 ```
-* *computePRESS* calculates the PRESS-statistic for the given explanatory variables (all combinations per subset size)
+
+#### bitSum
+
+Given an integer `code`, count all bits that are set to `1`. This function is used to compute the subset sizes.
+
 ```{r, echo=T, eval=T, warning=F, message=F}
-#' Compute PRESS for a set of predictors specified by the given code
-#' 
-#' @param code An integer in the interval [0, 2^length(predictors) - 1] that 
-#' encodes the selected predictors
-#' @param target Name of the target variable in the linear model
-#' @param predictors A vector of strings with predictor names
-#' @param data Dataframe that contains measurements for the target and all 
-#' predictors
-computePRESS <- function(code, target, predictors, data) {
+bitSum <- function(code, nBits=32) {
+  s <- 0
+  while (nBits > 0) {
+    if (code %% 2 == 1)  # check if current bit is set
+      s <- s + 1
+    code <- code %/% 2  # right shift to obtain next bit
+    nBits <- nBits - 1
+  }
+  return(s)
+}
+```
+
+#### computePress
+
+Compute PRESS for a set of variables specified by the given `code`. `target` is the (string) name of the response variable and `predictors` is the vector of \underline{all} explanatory variable names (including the ones that are not selected). `data` is the dataframe that contains measurements for `target` and all `predictors`.
+
+```{r, echo=T, eval=T, warning=F, message=F}
+computePress <- function(code, target, predictors, data) {
   p <- selectPredictors(code, predictors)
   if (is.null(p))  # empty model (iff code == 0)
     p <- "1"
@@ -104,30 +119,32 @@ computePRESS <- function(code, target, predictors, data) {
   return(MPV::PRESS(model))
 }
 ```
-* *bestPRESS* selects best model (according to PRESS) per subset size and outputs it as matrix
+
+#### bestPressDf
+
+Select best model according to PRESS per subset size and outputs it as matrix. Note that the empty model is omitted.
+
 ```{r, echo=T, eval=T, warning=F, message=F, tidy=TRUE, tidy.opts=list(width.cutoff=I(90))}
-
-#' @param target Name of the target variable in the linear model
-#' @param predictors A vector of strings with predictor names
-#' @param data Dataframe that contains measurements for the target and all 
-
-bestPRESS_df <- function(target, predictors, data) {
-  nModels <- 2**length(predictors)
-  modelCodes <- seq(0, nModels - 1)
-  presses <- sapply(X=modelCodes, FUN=computePRESS, target, predictors, data)
-  nrPredictors <- unlist(lapply(sapply(X=modelCodes, FUN=selectPredictors, predictors), FUN = length))
-  presses_predictors_df = data.frame(modelCodes, presses, nrPredictors)
-  minCode_nrPredictors <- presses_predictors_df %>% arrange(nrPredictors, presses) %>% distinct(nrPredictors, .keep_all = T)
-  bestPredictors <- sapply(X=minCode_nrPredictors$modelCodes, FUN = selectPredictors, predictors)
-  bestPredictorsdf <- data.frame(do.call(rbind, bestPredictors))
-  bestPredictorsdf[upper.tri(bestPredictorsdf)] <- NA
-  return(bestPredictorsdf)
+bestPressDf <- function(target, predictors, data) {
+  nPred <- length(predictors)
+  nModels <- 2**nPred
+  modelCodes <- seq(1, nModels - 1)  # skip empty model
+  modelSizes <- sapply(X=modelCodes, FUN=bitSum, nPred)
+  presses <- sapply(X=modelCodes, FUN=computePress, target, predictors, data)
+  bestCodes <- data.frame(modelCodes, modelSizes, presses) %>% 
+    arrange(modelSizes, presses) %>%
+    distinct(modelSizes, .keep_all=T) %>% 
+    dplyr::select(modelCodes)  # namespace only needed for RMarkdown
+  bestPred <- apply(bestCodes, 1, selectPredictors, predictors)  # sizes differ
+  bestDf <- lapply(bestPred, function(v) c(v, rep(NA, nPred - length(v)))) %>% 
+    as.data.frame(row.names = paste("X", seq(nPred), sep = "")) %>% 
+    t()
+  rownames(bestDf) <- seq(nPred)
+  return(bestDf)
 }
 ```
 
-\pagebreak
-
-## Application on real life data
+## Application on Real-World Data
 
 It follows a short demonstration based on a data set on bodyfat.
 
@@ -140,7 +157,7 @@ kable(head(data), format = "latex", booktabs = TRUE) %>%
 Applying the algorithm only consists of two steps:
 
 1. Select dependent and independent variables.
-2. Start the algorithm with the function *bestPRESS* and pass the selected variables and the data set to the function.
+2. Start the algorithm with the function `bestPressDf` and pass the selected variables and the data set to the function.
 
 ```{r, echo=T, eval=T, message=F, warning=F, tidy=TRUE, tidy.opts=list(width.cutoff=I(90)), include=T}
 
@@ -148,11 +165,13 @@ Applying the algorithm only consists of two steps:
 target <- "siri"
 
 # compute best subset of predictors for a lm after manual pre-selection
-predictors <- c("age", "weight_kg", "height_cm", "neck", "chest", "abdomen",
-                "hip", "thigh", "knee", "ankle", "biceps", "forearm", "wrist")
+predictors <- c("age", "weight_kg", "height_cm", "neck", "chest", "abdomen")
+#predictors <- c("age", "weight_kg", "height_cm", "neck", "chest", "abdomen",
+#                "hip", "thigh", "knee", "ankle", "biceps", "forearm", "wrist")
+
 
 start.time = Sys.time()
-best_subsets = bestPRESS_df(target, predictors, data)
+best_subsets = bestPressDf(target, predictors, data)
 end.time = Sys.time()
 
 
@@ -213,7 +232,7 @@ target_art <- "y"
 # compute best subset of predictors for a lm after manual pre-selection
 predictors_art <- c("x1", "x2", "x3", "x4", "x5", "x6", "x7", "x8")
 
-best_subsets = bestPRESS_df(target_art, predictors_art, as.data.frame(X))
+best_subsets = bestPressDf(target_art, predictors_art, as.data.frame(X))
 ```
 
 ```{r, echo=F, eval=T}
@@ -291,7 +310,7 @@ It has not yet been discussed how to deal with interaction terms. Although it ne
 predictors <- c("age", "weight_kg", "height_cm", "neck", "chest", "abdomen",
                 "hip", "thigh", "knee", "ankle", "biceps", "forearm", "wrist","age:knee")
 
-best_subsets = bestPRESS_df(target, predictors, data)
+#best_subsets = bestPressDf(target, predictors, data)
 
 ```
 
