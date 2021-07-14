@@ -5,17 +5,15 @@ date: "14.07.2021"
 output: pdf_document
 ---
 
+Sources available under <https://github.com/Lime91/best-press>.
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 library(MPV)
 library(dplyr)
 library(kableExtra)
-library(formatR)
 library(leaps)
 library(stringr)
-library(bestglm)
-library(MASS)
 opts <- options(knitr.kable.NA = "")
 ```
 
