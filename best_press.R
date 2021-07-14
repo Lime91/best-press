@@ -90,16 +90,16 @@ bestPressDf <- function(target, predictors, data) {
   modelCodes <- seq(1, nModels - 1)  # skip empty model
   modelSizes <- sapply(X=modelCodes, FUN=bitSum, nPred)
   presses <- sapply(X=modelCodes, FUN=computePress, target, predictors, data)
-  bestPredictorsDf <- data.frame(modelCodes, modelSizes, presses) %>% 
+  bestCodes <- data.frame(modelCodes, modelSizes, presses) %>% 
     arrange(modelSizes, presses) %>%
     distinct(modelSizes, .keep_all=T) %>% 
-    select(modelCodes) %>%
-    apply(1, selectPredictors, predictors) %>%  # sizes differ
-    lapply(function(v) c(v, rep(NA, nPred - length(v)))) %>%  # equal sizes
+    dplyr::select(modelCodes)  # namespace only needed for RMarkdown
+  bestPred <- apply(bestCodes, 1, selectPredictors, predictors)  # sizes differ
+  bestDf <- lapply(bestPred, function(v) c(v, rep(NA, nPred - length(v)))) %>% 
     as.data.frame(row.names = paste("X", seq(nPred), sep = "")) %>% 
     t()
-  rownames(bestPredictorsDf) <- seq(nPred)
-  return(bestPredictorsDf)
+  rownames(bestDf) <- seq(nPred)
+  return(bestDf)
 }
 
 # DEMO
@@ -113,9 +113,6 @@ predictors <- c("age", "weight_kg", "height_cm", "neck", "chest", "abdomen",
 bestPress(target, predictors, data)
 
 bestPressDf(target, predictors, data)
-
-
-
 
 
 
