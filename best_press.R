@@ -58,7 +58,7 @@ computePress <- function(code, target, predictors, data) {
 }
 
 
-#' Perform best subset varaible selection for linear models based on Allen's 
+#' Perform best subset variable selection for linear models based on Allen's 
 #' PRESS statistic. Computational complexity grows exponentially (!) in the 
 #' number of predictors. Hence, we recommend this technique only for small sets
 #' of preselected predictor variables.
@@ -70,7 +70,7 @@ computePress <- function(code, target, predictors, data) {
 bestPress <- function(target, predictors, data) {
   nModels <- 2**length(predictors)
   modelCodes <- seq(0, nModels - 1)
-  presses <- sapply(X=modelCodes, FUN=computePress, target, predictors, data)
+  presses <- sapply(modelCodes, computePress, target, predictors, data)
   minCode <- which.min(presses)
   bestPredictors <- selectPredictors(minCode, predictors)
   return(bestPredictors)
@@ -88,11 +88,11 @@ bestPressDf <- function(target, predictors, data) {
   nPred <- length(predictors)
   nModels <- 2**nPred
   modelCodes <- seq(1, nModels - 1)  # skip empty model
-  modelSizes <- sapply(X=modelCodes, FUN=bitSum, nPred)
-  presses <- sapply(X=modelCodes, FUN=computePress, target, predictors, data)
+  modelSizes <- sapply(modelCodes, bitSum, nPred)
+  presses <- sapply(modelCodes, computePress, target, predictors, data)
   bestCodes <- data.frame(modelCodes, modelSizes, presses) %>% 
     arrange(modelSizes, presses) %>%
-    distinct(modelSizes, .keep_all=T) %>% 
+    distinct(modelSizes, .keep_all = T) %>% 
     dplyr::select(modelCodes)  # namespace only needed for RMarkdown
   bestPred <- apply(bestCodes, 1, selectPredictors, predictors)  # sizes differ
   bestDf <- lapply(bestPred, function(v) c(v, rep(NA, nPred - length(v)))) %>% 
