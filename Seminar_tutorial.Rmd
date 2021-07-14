@@ -229,11 +229,12 @@ best_subsets = bestPressDf(target_art, predictors_art, as.data.frame(X))
 kable(best_subsets, format = "latex", col.names=NULL)
 ```
 
-The selection algorithm chooses `x1`, `x2` and `x3` as *best* explanatory variables for a model of size 3. This reflects the true model.
+The selection algorithm chooses `x1`, `x2` and `x3` as *best* explanatory variables for a model of size 3. This reflects the true model. Calculation of the PRESS-statistic for all 8 models showed, that the true model (`x1`, `x2`, `x3`) led to the lowest PRESS-value, meaning it was classified overall as *best* model.
+
 
 # Comparison to other algorithms
 
-In order to test the performance of the selection algorithm based on PRESS, we perform a comparison with other criteria in this chapter. We use the package `leaps` that provides a best subset selection technique based on likelihood information criteria. Our comparison is performed on both the body fat and the artificial dataset.
+In order to test the performance of the selection algorithm based on PRESS, we perform a comparison with other criteria in this chapter. We use the package `leaps` that provides a best subset selection technique based on likelihood information criteria. Our comparison is performed on both the body fat and the artificial data set.
 Note that the various information criteria (AIC, BIC, DIC, ...) differ only in how model complexity is penalized. Thus, if we fix the model size, the *best* model is independent of the choice of a specific information criterion.
 
 ```{r, echo=T, eval=T, include=T, tidy=TRUE, tidy.opts=list(width.cutoff=I(90))}
@@ -300,30 +301,12 @@ On the bodyfat dataset, we could show that PRESS selected similar subsets in com
 
 The results for the artificial dataset were even more similar to each other. Only 1/8 models was different between PRESS and the likelihood criteria. This increase in similarity might be attributed to the rather low complexity of the artificial dataset.
 
+We want to mention that it is possible to perform the algorithm even on models with interactions. Therefore a string with interaction notation has to be included within `predictors` ("x1:x2").
+
+Variable selection is often performed on larger datasets. It was shown that with 13 explanatory variables the algorithm already takes some time. Since the number of models increases exponentially, it has to be checked if the usage of the algorithm is still feasible at some point. This has to be mentioned as a limitation of this implementation.
+
 The main goal of this tutorial was to provide a working **best subset selection** algorithm based on **PRESS** as selection criterion, which was achieved. For a more detailed comparison with other selection algorithms we recommend to conduct further investigations.
 
-# Limitations
-
-* Interaction terms
-
-It has not yet been discussed how to deal with interaction terms. Although it needs some additional preparation, it is possible to add interactions within the *predictors*-vector by just combining the variable names with **:** as separator. For few interaction terms this can be done by hand. At some point *paste*-function can be useful to adapt the *predictors*-vector.
-
-```{r, echo=T,eval=T,include=T,warning=F,message=F}
-# example
-predictors <- c("age", "weight_kg", "height_cm", "neck", "chest", "abdomen",
-                "hip", "thigh", "knee", "ankle", "biceps", "forearm", "wrist","age:knee")
-
-best_subsets = bestPressDf(target, predictors, data)
-
-```
-
-```{r, echo=F, eval=T}
-kable(best_subsets, format = "latex") %>% kable_styling(latex_options = "scale_down")
-```
-
-* Algorithm runtime
-
-Variable selection is often performed in larger datasets. It was shown that with 13 explanatory variables the algorithm already takes some time. Since the number of models increases exponentially, it has to be checked if the usage of the algorithm is still feasible at some point.
 
 # References
 
